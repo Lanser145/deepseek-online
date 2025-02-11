@@ -9,7 +9,7 @@ from datetime import datetime
 # CONFIGURACIÓN INICIAL
 # ======================
 st.set_page_config(
-    page_title="Chatbot Gratuito",
+    page_title="Chatbot Avanzado",
     page_icon="🤖",
     layout="centered",
     initial_sidebar_state="expanded"
@@ -18,24 +18,21 @@ st.set_page_config(
 # ======================
 # MODELO PRINCIPAL (ACTUAL)
 # ======================
-MODEL_NAME = "microsoft/DialoGPT-large"  # 🚀 Modelo recomendado para diálogo
+MODEL_NAME = "HuggingFaceH4/zephyr-7b-beta"  # ⚡ Modelo moderno recomendado
 HF_TOKEN = os.getenv("HF_TOKEN")
-
-# ======================
-# MODELOS ALTERNATIVOS (DESCOMENTAR PARA USAR)
-# ======================
-# MODEL_NAME = "google/flan-t5-xxl"          # 📚 Para preguntas técnicas
-# MODEL_NAME = "OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5"  # 💡 Asistencia avanzada
-# MODEL_NAME = "HuggingFaceH4/zephyr-7b-beta"  # ⚡ Respuestas rápidas
 
 # ======================
 # CONFIGURACIONES POR MODELO
 # ======================
 MODEL_CONFIG = {
+    "HuggingFaceH4/zephyr-7b-beta": {
+        "max_tokens": 512,
+        "temp": 0.3,
+        "rep_penalty": 1.1
+    },
     "microsoft/DialoGPT-large": {"max_tokens": 150, "temp": 0.9},
     "google/flan-t5-xxl": {"max_tokens": 300, "temp": 0.3},
-    "OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5": {"max_tokens": 250, "temp": 0.7},
-    "HuggingFaceH4/zephyr-7b-beta": {"max_tokens": 200, "temp": 0.6}
+    "OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5": {"max_tokens": 250, "temp": 0.7}
 }
 
 # ======================
@@ -63,24 +60,54 @@ def guardar_chats(chats):
         return False
 
 # ======================
-# FUNCIÓN DE GENERACIÓN
+# FUNCIÓN DE GENERACIÓN MEJORADA
 # ======================
 def generar_respuesta(prompt):
     client = InferenceClient(token=HF_TOKEN)
     
+    # Preprocesamiento del input
+    prompt = prompt.strip().replace("\n", " ")
+    if not prompt:
+        return ""
+    
+    # Construcción del contexto
+    historial = st.session_state.chat_actual.get("historial", [])
+    
+    # Detección de idioma
+    if any(char in prompt for char in "áéíóúñ¿¡"):
+        lang_instruction = "Responde en español de manera natural y coloquial."
+    else:
+        lang_instruction = "Respond in natural, conversational English."
+    
+    messages = [{
+        "role": "system",
+        "content": f"Eres un asistente IA útil. {lang_instruction} Sé conciso pero informativo."
+    }]
+    
+    # Agregar historial reciente (últimos 6 intercambios)
+    for msg in historial[-6:]:
+        messages.append({
+            "role": "user" if msg["rol"] == "user" else "assistant",
+            "content": msg["contenido"]
+        })
+    
+    messages.append({"role": "user", "content": prompt})
+    
     try:
-        config = MODEL_CONFIG.get(MODEL_NAME, {"max_tokens": 200, "temp": 0.7})
-        return client.text_generation(
-            prompt,
+        config = MODEL_CONFIG.get(MODEL_NAME, {"max_tokens": 512, "temp": 0.3})
+        response = client.chat_completion(
+            messages=messages,
             model=MODEL_NAME,
-            max_new_tokens=config["max_tokens"],
+            max_tokens=config["max_tokens"],
             temperature=config["temp"],
-            repetition_penalty=1.1
+            repetition_penalty=config.get("rep_penalty", 1.1)
         )
+        return response.choices[0].message.content
+    
     except Exception as e:
         if "429" in str(e):
-            st.error("⚠️ Límite temporal alcanzado. Espera 1 minuto.")
-            time.sleep(60)
+            st.error("⚠️ Límite de solicitudes alcanzado. Espera 30 segundos...")
+            time.sleep(30)
             return generar_respuesta(prompt)
         return f"🚨 Error: {str(e)}"
 
@@ -123,10 +150,10 @@ def barra_lateral():
                         st.error(f"Error eliminando chat: {str(e)}")
 
         st.markdown("---")
-        st.caption(f"Modelo: {MODEL_NAME.split('/')[-1]} | v4.0")
+        st.caption(f"Modelo: {MODEL_NAME.split('/')[-1]} | v5.1")
 
 def area_chat():
-    st.title("🤖 Asistente AI Gratuito")
+    st.title("🤖 Asistente AI Avanzado")
     
     if not st.session_state.get("chat_actual"):
         st.warning("Selecciona o crea un chat desde la barra lateral")
@@ -145,9 +172,6 @@ def area_chat():
             
             with st.chat_message("assistant"):
                 st.markdown(respuesta)
-            
-            if "historial" not in st.session_state.chat_actual:
-                st.session_state.chat_actual["historial"] = []
             
             st.session_state.chat_actual["historial"].extend([
                 {"rol": "user", "contenido": prompt},
@@ -183,26 +207,37 @@ barra_lateral()
 area_chat()
 
 # ======================
-# ESTILOS
+# ESTILOS MEJORADOS
 # ======================
 st.markdown("""
 <style>
     [data-testid="stChatMessage"] {
-        padding: 1rem;
-        border-radius: 0.75rem;
+        padding: 1.2rem;
+        border-radius: 1rem;
         margin: 1rem 0;
         background: #1a1d24;
         border: 1px solid #2b313e;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        transition: transform 0.2s ease;
+    }
+    
+    [data-testid="stChatMessage"]:hover {
+        transform: translateX(5px);
     }
     
     .stButton>button {
         transition: all 0.3s ease;
+        border: 1px solid #3b4252 !important;
     }
     
     .stButton>button:hover {
-        transform: scale(1.05);
+        transform: scale(1.02);
         background: #2b313e !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    
+    .stSpinner>div {
+        border-color: #4c566a transparent transparent transparent !important;
     }
 </style>
 """, unsafe_allow_html=True)
