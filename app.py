@@ -1,5 +1,5 @@
 import streamlit as st
-import requests
+from huggingface_hub import InferenceClient
 import json
 import os
 from datetime import datetime
@@ -8,17 +8,17 @@ from datetime import datetime
 # CONFIGURACIÓN INICIAL
 # ======================
 st.set_page_config(
-    page_title="DeepSeek Cloud",
-    page_icon="🚀",
+    page_title="Chatbot Gratuito",
+    page_icon="🤖",
     layout="centered",
     initial_sidebar_state="expanded"
 )
 
 # ======================
-# SECRETOS Y API
+# MODELO GRATUITO
 # ======================
-API_KEY = os.getenv("DEEPSEEK_API_KEY")  # Configurar en secrets del despliegue
-API_URL = "https://api.deepseek.com/v1/chat/completions"  # Verificar endpoint real
+MODEL_NAME = "OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5"  # Modelo de diálogo
+HF_TOKEN = os.getenv("HF_TOKEN")  # Token gratuito de Hugging Face
 
 # ======================
 # MANEJO DE CHATS
@@ -43,31 +43,23 @@ def guardar_chats(chats):
         st.error(f"Error guardando chats: {str(e)}")
 
 # ======================
-# FUNCIONES DE LA API
+# FUNCIÓN DE GENERACIÓN
 # ======================
 def generar_respuesta(prompt):
-    """Envía la solicitud a la API de DeepSeek"""
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "model": "deepseek-r1-8b-chat",  # Modelo específico para chat
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7,
-        "max_tokens": 500
-    }
+    """Genera respuesta usando modelo gratuito de Hugging Face"""
+    client = InferenceClient(token=HF_TOKEN)
     
     try:
-        respuesta = requests.post(API_URL, headers=headers, json=payload, timeout=25)
-        respuesta.raise_for_status()
-        return respuesta.json()['choices'][0]['message']['content']
-        
-    except requests.exceptions.HTTPError as e:
-        return f"Error API: {e.response.status_code} - {e.response.text}"
+        response = client.text_generation(
+            prompt,
+            model=MODEL_NAME,
+            max_new_tokens=300,
+            temperature=0.8,
+            do_sample=True
+        )
+        return response
     except Exception as e:
-        return f"Error de conexión: {str(e)}"
+        return f"🚨 Error: {str(e)}"
 
 # ======================
 # INTERFAZ DE USUARIO
@@ -77,18 +69,16 @@ def barra_lateral():
     with st.sidebar:
         st.header("Gestión de Chats")
         
-        # Botón nuevo chat
         if st.button("✨ Nuevo Chat", use_container_width=True):
             nuevo_chat = {
                 "id": str(datetime.now().timestamp()),
-                "titulo": "Nuevo Chat",
+                "titulo": f"Chat {len(st.session_state.chats) + 1}",
                 "historial": []
             }
             st.session_state.chats.append(nuevo_chat)
             st.session_state.chat_actual = nuevo_chat
             guardar_chats(st.session_state.chats)
         
-        # Lista de chats
         for chat in st.session_state.chats:
             cols = st.columns([8, 2])
             with cols[0]:
@@ -106,12 +96,11 @@ def barra_lateral():
                     st.rerun()
         
         st.markdown("---")
-        st.caption("v1.0 | Desarrollado por [Tu Nombre]")
+        st.caption("v2.0 | Chatbot Gratuito")
 
 def area_chat():
     """Construye el área principal del chat"""
-    st.title("DeepSeek Cloud Assistant")
-    st.caption("Conectado a la API oficial de DeepSeek")
+    st.title("🤖 Asistente AI Gratuito")
     
     if st.session_state.chat_actual:
         for mensaje in st.session_state.chat_actual["historial"]:
@@ -122,16 +111,15 @@ def area_chat():
         with st.chat_message("user"):
             st.markdown(prompt)
         
-        with st.spinner("Procesando..."):
-            respuesta_api = generar_respuesta(prompt)
+        with st.spinner("Generando respuesta..."):
+            respuesta = generar_respuesta(prompt)
             
             with st.chat_message("assistant"):
-                st.markdown(respuesta_api)
+                st.markdown(respuesta)
             
-            # Actualizar historial
             st.session_state.chat_actual["historial"].extend([
                 {"rol": "user", "contenido": prompt},
-                {"rol": "assistant", "contenido": respuesta_api}
+                {"rol": "assistant", "contenido": respuesta}
             ])
             guardar_chats(st.session_state.chats)
 
@@ -156,24 +144,27 @@ area_chat()
 st.markdown("""
 <style>
     [data-testid="stChatMessage"] {
-        padding: 1.5rem;
-        border-radius: 15px;
+        padding: 1.2rem;
+        border-radius: 12px;
         margin: 1rem 0;
         background: #1a1d24;
         border: 1px solid #2b313e;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
     
     textarea {
         background: #1a1d24 !important;
         border: 1px solid #2b313e !important;
+        color: white !important;
     }
     
     .stButton button {
-        transition: transform 0.2s !important;
+        transition: all 0.2s ease !important;
     }
     
     .stButton button:hover {
         transform: scale(1.05);
+        background: #2b313e !important;
     }
 </style>
 """, unsafe_allow_html=True)
