@@ -18,8 +18,10 @@ st.set_page_config(
 # ======================
 # MODELO GRATUITO
 # ======================
-MODEL_NAME = "HuggingFaceH4/zephyr-7b-beta"  # Modelo gratuito y sin restricciones
+MODEL_NAME = "microsoft/DialoGPT-medium"  # Versión medium
+# MODEL_NAME = "microsoft/DialoGPT-large"  # Versión más potente
 HF_TOKEN = os.getenv("HF_TOKEN")  # Token de Hugging Face
+# MODEL_NAME = "google/flan-t5-xxl"
 
 # ======================
 # MANEJO DE CHATS (CORREGIDO)
@@ -49,6 +51,15 @@ def guardar_chats(chats):
 # FUNCIÓN DE GENERACIÓN (CORREGIDA)
 # ======================
 def generar_respuesta(prompt):
+    client = InferenceClient(token=HF_TOKEN)
+    try:
+        return client.conversational(
+            text=prompt,
+            model=MODEL_NAME,
+            max_length=200
+        ).generated_text
+    except Exception as e:
+        return f"Error: {str(e)}"
     client = InferenceClient(token=HF_TOKEN)
     
     try:
