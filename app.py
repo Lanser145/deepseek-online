@@ -15,26 +15,15 @@ st.set_page_config(
 )
 
 # ======================
-# MODELO GRATUITO
+# MODELO GRATUITO (MODIFICAR SI ES NECESARIO)
 # ======================
-MODEL_NAME = "meta-llama/Llama-2-7b-chat-hf"  # Modelo de diálogo
-HF_TOKEN = os.getenv("HF_TOKEN")  # Token gratuito de Hugging Face
-
-# Para diálogo avanzado (solicitar acceso):
-# MODEL_NAME = "meta-llama/Llama-2-7b-chat-hf"  
-# MODEL_NAME = "OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5"
-
-# Respuestas rápidas:
-# MODEL_NAME = "HuggingFaceH4/zephyr-7b-beta"
-
-# Procesamiento en español:
-#MODEL_NAME = "bertin-project/bertin-gpt-j-6B-8bits"
+MODEL_NAME = "HuggingFaceH4/zephyr-7b-beta"  # Modelo alternativo recomendado
+HF_TOKEN = os.getenv("HF_TOKEN")  # Token de Hugging Face
 
 # ======================
-# MANEJO DE CHATS
+# MANEJO DE CHATS (CORREGIDO)
 # ======================
 def cargar_chats():
-    """Carga el historial de chats desde un archivo JSON"""
     try:
         if os.path.exists("chats_db.json"):
             with open("chats_db.json", "r") as f:
@@ -45,7 +34,6 @@ def cargar_chats():
         return []
 
 def guardar_chats(chats):
-    """Guarda el historial de chats en un archivo JSON"""
     try:
         with open("chats_db.json", "w") as f:
             json.dump(chats, f, indent=4)
@@ -53,29 +41,28 @@ def guardar_chats(chats):
         st.error(f"Error guardando chats: {str(e)}")
 
 # ======================
-# FUNCIÓN DE GENERACIÓN
+# FUNCIÓN DE GENERACIÓN (MEJORADA)
 # ======================
 def generar_respuesta(prompt):
-    """Genera respuesta usando modelo gratuito de Hugging Face"""
     client = InferenceClient(token=HF_TOKEN)
     
     try:
         response = client.text_generation(
             prompt,
             model=MODEL_NAME,
-            max_new_tokens=300,
-            temperature=0.8,
-            do_sample=True
+            max_new_tokens=200,
+            temperature=0.7,
+            do_sample=True,
+            timeout=15
         )
         return response
     except Exception as e:
         return f"🚨 Error: {str(e)}"
 
 # ======================
-# INTERFAZ DE USUARIO
+# INTERFAZ DE USUARIO (CORREGIDA)
 # ======================
 def barra_lateral():
-    """Construye la barra lateral de gestión de chats"""
     with st.sidebar:
         st.header("Gestión de Chats")
         
@@ -106,17 +93,22 @@ def barra_lateral():
                     st.rerun()
         
         st.markdown("---")
-        st.caption("v2.0 | Chatbot Gratuito")
+        st.caption("v2.1 | Chatbot Gratuito")
 
 def area_chat():
-    """Construye el área principal del chat"""
     st.title("🤖 Asistente AI Gratuito")
     
-    if st.session_state.chat_actual:
-        for mensaje in st.session_state.chat_actual["historial"]:
-            with st.chat_message(mensaje["rol"]):
-                st.markdown(mensaje["contenido"])
+    # Verificar si hay chat activo
+    if not st.session_state.chat_actual:
+        st.warning("⚠️ Selecciona o crea un nuevo chat desde la barra lateral")
+        return
     
+    # Mostrar historial
+    for mensaje in st.session_state.chat_actual.get("historial", []):
+        with st.chat_message(mensaje["rol"]):
+            st.markdown(mensaje["contenido"])
+    
+    # Procesar input
     if prompt := st.chat_input("Escribe tu mensaje..."):
         with st.chat_message("user"):
             st.markdown(prompt)
@@ -127,20 +119,34 @@ def area_chat():
             with st.chat_message("assistant"):
                 st.markdown(respuesta)
             
-            st.session_state.chat_actual["historial"].extend([
-                {"rol": "user", "contenido": prompt},
-                {"rol": "assistant", "contenido": respuesta}
-            ])
-            guardar_chats(st.session_state.chats)
+            # Verificación adicional antes de actualizar
+            if st.session_state.chat_actual:
+                st.session_state.chat_actual.setdefault("historial", []).extend([
+                    {"rol": "user", "contenido": prompt},
+                    {"rol": "assistant", "contenido": respuesta}
+                ])
+                guardar_chats(st.session_state.chats)
+            else:
+                st.error("Error: No hay chat activo")
 
 # ======================
-# INICIALIZACIÓN
+# INICIALIZACIÓN (CORREGIDA)
 # ======================
 if "chats" not in st.session_state:
     st.session_state.chats = cargar_chats()
     
 if "chat_actual" not in st.session_state:
-    st.session_state.chat_actual = None
+    if len(st.session_state.chats) > 0:
+        st.session_state.chat_actual = st.session_state.chats[0]
+    else:
+        nuevo_chat = {
+            "id": str(datetime.now().timestamp()),
+            "titulo": "Chat 1",
+            "historial": []
+        }
+        st.session_state.chats.append(nuevo_chat)
+        st.session_state.chat_actual = nuevo_chat
+        guardar_chats(st.session_state.chats)
 
 # ======================
 # EJECUCIÓN PRINCIPAL
@@ -149,7 +155,7 @@ barra_lateral()
 area_chat()
 
 # ======================
-# ESTILOS
+# ESTILOS (IGUAL)
 # ======================
 st.markdown("""
 <style>
