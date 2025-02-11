@@ -16,13 +16,13 @@ st.set_page_config(
 )
 
 # ======================
-# MODELO GRATUITO (ACTUALIZADO)
+# MODELO GRATUITO
 # ======================
-MODEL_NAME = "HuggingFaceH4/zephyr-7b-beta"  # Modelo gratuito y sin restricciones
+MODEL_NAME = "HuggingFaceH4/zephyr-7b-beta"
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 # ======================
-# MANEJO DE CHATS (MEJORADO)
+# MANEJO DE CHATS (CORREGIDO)
 # ======================
 CHATS_FILE = "chats_db.json"
 
@@ -46,29 +46,20 @@ def guardar_chats(chats):
         return False
 
 # ======================
-# FUNCIÓN DE GENERACIÓN (CON CONTROL DE ERRORES)
+# FUNCIÓN DE GENERACIÓN
 # ======================
 def generar_respuesta(prompt):
     client = InferenceClient(token=HF_TOKEN)
-    
     try:
-        response = client.text_generation(
+        return client.text_generation(
             prompt,
             model=MODEL_NAME,
             max_new_tokens=150,
             temperature=0.7,
-            do_sample=True,
             timeout=10
         )
-        return response
-    
     except Exception as e:
-        if "429" in str(e):
-            st.error("⚠️ Límite de solicitudes alcanzado. Espera 1 minuto.")
-            time.sleep(60)
-            return generar_respuesta(prompt)
-        else:
-            return f"🚨 Error: {str(e)}"
+        return f"🚨 Error: {str(e)}"
 
 # ======================
 # INTERFAZ DE USUARIO (CORREGIDA)
@@ -77,6 +68,7 @@ def barra_lateral():
     with st.sidebar:
         st.header("Gestión de Chats")
         
+        # Botón nuevo chat
         if st.button("✨ Nuevo Chat", use_container_width=True):
             nuevo_chat = {
                 "id": str(time.time()),
@@ -85,10 +77,10 @@ def barra_lateral():
             }
             st.session_state.chats.append(nuevo_chat)
             st.session_state.chat_actual = nuevo_chat
-            if not guardar_chats(st.session_state.chats):
-                st.error("Error guardando el nuevo chat")
-
-        for chat in st.session_state.chats:
+            guardar_chats(st.session_state.chats)
+        
+        # Lista de chats
+        for chat in st.session_state.chats.copy():
             cols = st.columns([8, 2])
             with cols[0]:
                 if st.button(
@@ -101,45 +93,45 @@ def barra_lateral():
             with cols[1]:
                 if st.button("❌", key=f"del_{chat['id']}"):
                     try:
+                        # Verificar si es el chat actual
+                        if st.session_state.chat_actual and st.session_state.chat_actual["id"] == chat["id"]:
+                            st.session_state.chat_actual = None
                         st.session_state.chats.remove(chat)
-                        if not guardar_chats(st.session_state.chats):
-                            st.error("Error eliminando chat")
+                        guardar_chats(st.session_state.chats)
                         st.rerun()
-                    except ValueError:
-                        st.error("Chat no encontrado")
+                    except Exception as e:
+                        st.error(f"Error eliminando chat: {str(e)}")
 
         st.markdown("---")
-        st.caption("v3.0 | Chatbot Estable")
+        st.caption("v3.1 | Chatbot Estable")
 
 def area_chat():
     st.title("🤖 Asistente AI Gratuito")
     
+    # Verificación robusta del chat actual
     if not st.session_state.get("chat_actual"):
-        st.warning("Selecciona o crea un chat desde la barra lateral")
+        st.warning("⚠️ Crea o selecciona un chat desde la barra lateral")
         return
     
-    try:
-        for mensaje in st.session_state.chat_actual["historial"]:
-            with st.chat_message(mensaje["rol"]):
-                st.markdown(mensaje["contenido"])
-    except KeyError:
-        st.session_state.chat_actual["historial"] = []
+    # Mostrar historial con verificación
+    for mensaje in st.session_state.chat_actual.get("historial", []):
+        with st.chat_message(mensaje.get("rol", "user")):
+            st.markdown(mensaje.get("contenido", ""))
     
+    # Procesar mensaje
     if prompt := st.chat_input("Escribe tu mensaje..."):
         with st.chat_message("user"):
             st.markdown(prompt)
         
-        try:
-            with st.spinner("Generando respuesta..."):
-                respuesta = generar_respuesta(prompt)
+        with st.spinner("Generando respuesta..."):
+            respuesta = generar_respuesta(prompt)
             
             with st.chat_message("assistant"):
                 st.markdown(respuesta)
             
-            nuevo_mensaje = {
-                "user": prompt,
-                "assistant": respuesta
-            }
+            # Actualizar historial con verificación
+            if "historial" not in st.session_state.chat_actual:
+                st.session_state.chat_actual["historial"] = []
             
             st.session_state.chat_actual["historial"].extend([
                 {"rol": "user", "contenido": prompt},
@@ -148,18 +140,16 @@ def area_chat():
             
             if not guardar_chats(st.session_state.chats):
                 st.error("Error guardando la conversación")
-        
-        except Exception as e:
-            st.error(f"Error crítico: {str(e)}")
 
 # ======================
-# INICIALIZACIÓN ROBUSTA
+# INICIALIZACIÓN ROBUSTA (CORREGIDA)
 # ======================
 if "chats" not in st.session_state:
-    st.session_state.chats = cargar_chats() or []
+    st.session_state.chats = cargar_chats()
 
-if "chat_actual" not in st.session_state:
-    if st.session_state.chats:
+# Garantizar que siempre haya un chat activo
+if not hasattr(st.session_state, "chat_actual") or not st.session_state.chat_actual:
+    if len(st.session_state.chats) > 0:
         st.session_state.chat_actual = st.session_state.chats[0]
     else:
         nuevo_chat = {
@@ -178,29 +168,26 @@ barra_lateral()
 area_chat()
 
 # ======================
-# ESTILOS (MEJORADOS)
+# ESTILOS MEJORADOS
 # ======================
 st.markdown("""
 <style>
     [data-testid="stChatMessage"] {
         padding: 1rem;
-        border-radius: 0.5rem;
-        margin: 0.5rem 0;
-        background: #1E1E1E;
-        border: 1px solid #333;
+        border-radius: 0.75rem;
+        margin: 1rem 0;
+        background: #1a1d24;
+        border: 1px solid #2b313e;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
     
     .stButton>button {
-        transition: all 0.3s ease;
+        transition: transform 0.2s ease, background 0.3s ease !important;
     }
     
     .stButton>button:hover {
-        transform: scale(1.05);
-        background: #2A2A2A !important;
-    }
-    
-    [data-testid="stStatusWidget"] {
-        visibility: hidden;
+        transform: scale(1.03);
+        background: #2b313e !important;
     }
 </style>
 """, unsafe_allow_html=True)
