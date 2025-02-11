@@ -17,11 +17,12 @@ st.set_page_config(
 # ======================
 # MODELO GRATUITO
 # ======================
-MODEL_NAME = "OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5"  # Modelo de diálogo
+MODEL_NAME = "meta-llama/Llama-2-7b-chat-hf"  # Modelo de diálogo
 HF_TOKEN = os.getenv("HF_TOKEN")  # Token gratuito de Hugging Face
 
 # Para diálogo avanzado (solicitar acceso):
 # MODEL_NAME = "meta-llama/Llama-2-7b-chat-hf"  
+# MODEL_NAME = "OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5"
 
 # Respuestas rápidas:
 # MODEL_NAME = "HuggingFaceH4/zephyr-7b-beta"
