@@ -18,8 +18,8 @@ st.set_page_config(
 # ======================
 # MODELO GRATUITO
 # ======================
-MODEL_NAME = "HuggingFaceH4/zephyr-7b-beta"
-HF_TOKEN = os.getenv("HF_TOKEN")
+MODEL_NAME = "HuggingFaceH4/zephyr-7b-beta"  # Modelo gratuito y sin restricciones
+HF_TOKEN = os.getenv("HF_TOKEN")  # Token de Hugging Face
 
 # ======================
 # MANEJO DE CHATS (CORREGIDO)
@@ -46,20 +46,27 @@ def guardar_chats(chats):
         return False
 
 # ======================
-# FUNCIÓN DE GENERACIÓN
+# FUNCIÓN DE GENERACIÓN (CORREGIDA)
 # ======================
 def generar_respuesta(prompt):
     client = InferenceClient(token=HF_TOKEN)
+    
     try:
-        return client.text_generation(
+        response = client.text_generation(
             prompt,
             model=MODEL_NAME,
-            max_new_tokens=150,
-            temperature=0.7,
-            timeout=10
+            max_new_tokens=150,  # Respuestas más cortas para mayor velocidad
+            temperature=0.7,    # Menos creatividad, más consistencia
+            do_sample=True      # Mejor calidad de respuestas
         )
+        return response
     except Exception as e:
-        return f"🚨 Error: {str(e)}"
+        if "429" in str(e):  # Límite de solicitudes alcanzado
+            st.error("⚠️ Límite de solicitudes alcanzado. Espera 1 minuto.")
+            time.sleep(60)  # Espera 1 minuto antes de reintentar
+            return generar_respuesta(prompt)  # Reintentar
+        else:
+            return f"🚨 Error: {str(e)}"
 
 # ======================
 # INTERFAZ DE USUARIO (CORREGIDA)
@@ -68,7 +75,6 @@ def barra_lateral():
     with st.sidebar:
         st.header("Gestión de Chats")
         
-        # Botón nuevo chat
         if st.button("✨ Nuevo Chat", use_container_width=True):
             nuevo_chat = {
                 "id": str(time.time()),
@@ -79,8 +85,7 @@ def barra_lateral():
             st.session_state.chat_actual = nuevo_chat
             guardar_chats(st.session_state.chats)
         
-        # Lista de chats
-        for chat in st.session_state.chats.copy():
+        for chat in st.session_state.chats.copy():  # Copia para iteración segura
             cols = st.columns([8, 2])
             with cols[0]:
                 if st.button(
@@ -103,7 +108,7 @@ def barra_lateral():
                         st.error(f"Error eliminando chat: {str(e)}")
 
         st.markdown("---")
-        st.caption("v3.1 | Chatbot Estable")
+        st.caption("v3.2 | Chatbot Estable")
 
 def area_chat():
     st.title("🤖 Asistente AI Gratuito")
