@@ -20,6 +20,15 @@ st.set_page_config(
 MODEL_NAME = "OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5"  # Modelo de diálogo
 HF_TOKEN = os.getenv("HF_TOKEN")  # Token gratuito de Hugging Face
 
+# Para diálogo avanzado (solicitar acceso):
+# MODEL_NAME = "meta-llama/Llama-2-7b-chat-hf"  
+
+# Respuestas rápidas:
+# MODEL_NAME = "HuggingFaceH4/zephyr-7b-beta"
+
+# Procesamiento en español:
+#MODEL_NAME = "bertin-project/bertin-gpt-j-6B-8bits"
+
 # ======================
 # MANEJO DE CHATS
 # ======================
